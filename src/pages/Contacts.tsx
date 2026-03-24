@@ -1,180 +1,202 @@
-import { useState } from "react";
-import { Search, Plus, Mail, Phone, MoreHorizontal, Filter, Users } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCrm, CONTACT_STAGES } from "@/contexts/CrmContext";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search, Filter, Plus, Eye, Edit, Trash2, Users
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select";
+import { toast } from "sonner";
 
-interface Contact {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  company: string;
-  stage: string;
-  value: string;
-  lastActivity: string;
-}
-
-const initialContacts: Contact[] = [
-  { id: "1", name: "Danny Quiñones", email: "dqventas00@gmail.com", phone: "+573016188586", company: "DQ Ventures", stage: "Calificado", value: "$95,000,000", lastActivity: "hace 25 min" },
-  { id: "2", name: "María López", email: "maria@empresa.com", phone: "+571234567890", company: "Tech Corp", stage: "Propuesta", value: "$12,500", lastActivity: "hace 1h" },
-  { id: "3", name: "Carlos Pérez", email: "carlos@startup.io", phone: "+575551234567", company: "StartUp IO", stage: "Nuevo", value: "$8,200", lastActivity: "hace 3h" },
-  { id: "4", name: "Ana Torres", email: "ana@digital.co", phone: "+579876543210", company: "Digital Co", stage: "Negociación", value: "$45,000", lastActivity: "hace 5h" },
-  { id: "5", name: "Juan García", email: "juan@corp.com", phone: "+571112223334", company: "Corp SA", stage: "Cerrado", value: "$22,000", lastActivity: "ayer" },
-];
-
-const stageBadge = (stage: string) => {
-  const colors: Record<string, string> = {
-    Nuevo: "bg-info/10 text-info",
-    Calificado: "bg-primary/10 text-primary",
-    Propuesta: "bg-warning/10 text-warning",
-    Negociación: "bg-accent text-accent-foreground",
-    Cerrado: "bg-success/10 text-success",
-  };
-  return colors[stage] || "bg-muted text-muted-foreground";
+const stageColor: Record<string, string> = {
+  Nuevo: "bg-blue-500/20 text-blue-400",
+  Contactado: "bg-yellow-500/20 text-yellow-400",
+  Calificado: "bg-primary/20 text-primary",
+  Propuesta: "bg-orange-500/20 text-orange-400",
+  Negociación: "bg-purple-500/20 text-purple-400",
+  Cerrado: "bg-primary/20 text-primary",
 };
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState(initialContacts);
+  const { contacts, addContact, updateContact, deleteContact } = useCrm();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [newContact, setNewContact] = useState({ name: "", email: "", phone: "", company: "" });
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [showCreate, setShowCreate] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", company: "", stage: "Nuevo", value: "" });
 
-  const filtered = contacts.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase()) ||
-    c.company.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    return contacts.filter((c) => {
+      const matchSearch = !search || [c.name, c.email, c.company, c.phone].some((f) => f.toLowerCase().includes(search.toLowerCase()));
+      const matchStage = stageFilter === "all" || c.stage === stageFilter;
+      return matchSearch && matchStage;
+    });
+  }, [contacts, search, stageFilter]);
 
-  const handleAdd = () => {
-    if (!newContact.name || !newContact.email) return;
-    setContacts([
-      {
-        id: Date.now().toString(),
-        ...newContact,
-        stage: "Nuevo",
-        value: "$0",
-        lastActivity: "ahora",
-      },
-      ...contacts,
-    ]);
-    setNewContact({ name: "", email: "", phone: "", company: "" });
-    setDialogOpen(false);
-    toast({ title: "Contacto creado", description: `${newContact.name} fue agregado.` });
+  const resetForm = () => setForm({ name: "", email: "", phone: "", company: "", stage: "Nuevo", value: "" });
+
+  const handleCreate = () => {
+    if (!form.name.trim()) { toast.error("El nombre es requerido"); return; }
+    addContact({ name: form.name, email: form.email, phone: form.phone, company: form.company, stage: form.stage, value: Number(form.value) || 0, source: "Manual" });
+    toast.success("Contacto creado", { description: `${form.name} fue agregado.` });
+    setShowCreate(false);
+    resetForm();
   };
 
-  return (
-    <div className="p-4 md:p-6 space-y-4 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Contactos</h1>
-          <p className="text-xs text-muted-foreground">{contacts.length} contactos totales</p>
+  const handleEdit = () => {
+    if (!editId || !form.name.trim()) return;
+    updateContact(editId, { name: form.name, email: form.email, phone: form.phone, company: form.company, stage: form.stage, value: Number(form.value) || 0 });
+    toast.success("Contacto actualizado");
+    setEditId(null);
+    resetForm();
+  };
+
+  const handleDelete = (id: string, name: string) => {
+    deleteContact(id);
+    toast.success("Contacto eliminado", { description: `${name} fue eliminado.` });
+  };
+
+  const openEdit = (c: typeof contacts[0]) => {
+    setForm({ name: c.name, email: c.email, phone: c.phone, company: c.company, stage: c.stage, value: c.value.toString() });
+    setEditId(c.id);
+  };
+
+  const timeAgo = (d: string) => {
+    const mins = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
+    if (mins < 60) return `hace ${mins} min`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `hace ${hrs}h`;
+    return `hace ${Math.floor(hrs / 24)}d`;
+  };
+
+  const ContactForm = ({ onSubmit, title, btnLabel }: { onSubmit: () => void; title: string; btnLabel: string }) => (
+    <>
+      <DialogHeader>
+        <DialogTitle className="text-base">{title}</DialogTitle>
+        <DialogDescription className="text-xs text-muted-foreground">Completa los campos del contacto</DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3 mt-2">
+        {[
+          { key: "name", label: "Nombre", type: "text", placeholder: "Nombre completo" },
+          { key: "email", label: "Email", type: "email", placeholder: "correo@ejemplo.com" },
+          { key: "phone", label: "Teléfono", type: "tel", placeholder: "+1 555-0000" },
+          { key: "company", label: "Empresa", type: "text", placeholder: "Nombre de empresa" },
+          { key: "value", label: "Valor ($)", type: "number", placeholder: "0" },
+        ].map((f) => (
+          <div key={f.key} className="space-y-1">
+            <Label className="text-xs">{f.label}</Label>
+            <Input type={f.type} value={form[f.key as keyof typeof form]} onChange={(e) => setForm((prev) => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder} className="h-8 text-xs bg-secondary border-border" />
+          </div>
+        ))}
+        <div className="space-y-1">
+          <Label className="text-xs">Etapa</Label>
+          <Select value={form.stage} onValueChange={(v) => setForm((prev) => ({ ...prev, stage: v }))}>
+            <SelectTrigger className="h-8 text-xs bg-secondary border-border"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CONTACT_STAGES.map((s) => (<SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>))}
+            </SelectContent>
+          </Select>
         </div>
-        <div className="flex gap-2">
+        <Button variant="glow" className="w-full h-8 text-xs mt-2" onClick={onSubmit}>{btnLabel}</Button>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="p-6 space-y-4">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Contactos</h1>
+          <p className="text-xs text-muted-foreground">{filtered.length} contactos {stageFilter !== "all" && `en ${stageFilter}`}</p>
+        </div>
+        <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-56">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar contactos..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-xs bg-secondary border-border"
-            />
+            <Input placeholder="Buscar contactos..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 text-xs pl-8 bg-secondary border-border" />
           </div>
-          <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-            <Filter size={12} /> Filtros
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="h-8 w-[130px] text-xs bg-secondary border-border">
+              <Filter size={12} className="mr-1" /><SelectValue placeholder="Filtrar" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">Todas</SelectItem>
+              {CONTACT_STAGES.map((s) => (<SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>))}
+            </SelectContent>
+          </Select>
+          <Button variant="glow" size="sm" className="h-8 text-xs" onClick={() => { resetForm(); setShowCreate(true); }}>
+            <Plus size={14} /> Agregar
           </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-8 text-xs gap-1" variant="glow">
-                <Plus size={12} /> Agregar
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-card border-border">
-              <DialogHeader>
-                <DialogTitle className="text-sm">Nuevo contacto</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3 pt-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Nombre</Label>
-                  <Input className="h-8 text-xs bg-secondary" value={newContact.name} onChange={(e) => setNewContact({ ...newContact, name: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Email</Label>
-                  <Input className="h-8 text-xs bg-secondary" type="email" value={newContact.email} onChange={(e) => setNewContact({ ...newContact, email: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Teléfono</Label>
-                  <Input className="h-8 text-xs bg-secondary" value={newContact.phone} onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Empresa</Label>
-                  <Input className="h-8 text-xs bg-secondary" value={newContact.company} onChange={(e) => setNewContact({ ...newContact, company: e.target.value })} />
-                </div>
-                <Button className="w-full h-8 text-xs" variant="glow" onClick={handleAdd}>Crear contacto</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px]">
             <thead>
-              <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-4 py-2.5 text-2xs font-medium text-muted-foreground">Nombre</th>
-                <th className="text-left px-4 py-2.5 text-2xs font-medium text-muted-foreground">Email</th>
-                <th className="text-left px-4 py-2.5 text-2xs font-medium text-muted-foreground">Empresa</th>
-                <th className="text-left px-4 py-2.5 text-2xs font-medium text-muted-foreground">Etapa</th>
-                <th className="text-right px-4 py-2.5 text-2xs font-medium text-muted-foreground">Valor</th>
-                <th className="text-right px-4 py-2.5 text-2xs font-medium text-muted-foreground">Actividad</th>
-                <th className="w-10"></th>
+              <tr className="border-b border-border">
+                {["Nombre", "Email", "Empresa", "Etapa", "Valor", "Actividad", ""].map((h) => (
+                  <th key={h} className="px-4 py-2.5 text-left text-2xs font-medium text-muted-foreground uppercase tracking-wider">{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map((c) => (
-                <tr key={c.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xs font-semibold shrink-0">
-                        {c.name.charAt(0)}
+            <tbody>
+              <AnimatePresence>
+                {filtered.map((c, i) => (
+                  <motion.tr key={c.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ delay: i * 0.03 }} className="border-b border-border/50 hover:bg-accent/30 transition-colors cursor-pointer group" onClick={() => navigate(`/contacts/${c.id}`)}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-semibold shrink-0">{c.name.charAt(0)}</div>
+                        <span className="text-xs font-medium text-foreground">{c.name}</span>
                       </div>
-                      <span className="text-xs font-medium text-foreground">{c.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.email}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{c.company}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-2xs font-medium ${stageBadge(c.stage)}`}>
-                      {c.stage}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-foreground text-right font-medium">{c.value}</td>
-                  <td className="px-4 py-3 text-2xs text-muted-foreground text-right">{c.lastActivity}</td>
-                  <td className="px-2 py-3">
-                    <div className="flex gap-1">
-                      <button className="p-1 text-muted-foreground hover:text-foreground"><Mail size={12} /></button>
-                      <button className="p-1 text-muted-foreground hover:text-foreground"><Phone size={12} /></button>
-                      <button className="p-1 text-muted-foreground hover:text-foreground"><MoreHorizontal size={12} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{c.email}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{c.company}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-2xs px-2 py-0.5 rounded-full font-medium ${stageColor[c.stage] || "bg-muted text-muted-foreground"}`}>{c.stage}</span>
+                    </td>
+                    <td className="px-4 py-3 text-xs font-medium text-foreground">${c.value.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-2xs text-muted-foreground">{timeAgo(c.createdAt)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => navigate(`/contacts/${c.id}`)}><Eye size={14} /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(c)}><Edit size={14} /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(c.id, c.name)}><Trash2 size={14} /></Button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>
         {filtered.length === 0 && (
-          <div className="p-12 text-center">
-            <Users size={32} className="mx-auto text-muted-foreground/30 mb-3" />
-            <p className="text-xs text-muted-foreground">No se encontraron contactos</p>
+          <div className="py-12 text-center">
+            <Users size={32} className="mx-auto text-muted-foreground/30 mb-2" />
+            <p className="text-sm text-muted-foreground">No se encontraron contactos</p>
           </div>
         )}
-      </div>
+      </motion.div>
+
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="sm:max-w-md">
+          <ContactForm onSubmit={handleCreate} title="Nuevo contacto" btnLabel="Crear contacto" />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editId} onOpenChange={(open) => { if (!open) setEditId(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <ContactForm onSubmit={handleEdit} title="Editar contacto" btnLabel="Guardar cambios" />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
