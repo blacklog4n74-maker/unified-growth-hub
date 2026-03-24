@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Plus, Mail, Phone, MoreHorizontal, Filter } from "lucide-react";
+import { Search, Plus, Mail, Phone, MoreHorizontal, Filter, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
