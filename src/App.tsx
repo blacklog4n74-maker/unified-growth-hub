@@ -52,7 +52,7 @@ const App = () => (
                 <Route path="/inbox" element={<InboxPage />} />
                 <Route path="/automation" element={<StubPage title="Automatización" description="Crea workflows, triggers y acciones automáticas para escalar tu negocio." icon={Zap} />} />
                 <Route path="/funnels" element={<StubPage title="Funnels & Websites" description="Diseña landing pages, funnels de conversión y sitios web completos." icon={Globe} />} />
-                <Route path="/ai" element={<StubPage title="Inteligencia Artificial" description="Conversation AI, Voice AI, Content AI y más. Potencia tu equipo con IA." icon={Bot} />} />
+                <Route path="/ai" element={<AiAssistantPage />} />
                 <Route path="/reputation" element={<StubPage title="Reputación" description="Monitorea y gestiona reseñas, solicita feedback y mejora tu presencia online." icon={Star} />} />
                 <Route path="/analytics" element={<StubPage title="Analítica" description="Dashboards personalizables con métricas de pipeline, conversión e ingresos." icon={BarChart3} />} />
                 <Route path="/courses" element={<StubPage title="Cursos & Comunidad" description="Crea membresías, cursos y comunidades privadas para tus clientes." icon={BookOpen} />} />
