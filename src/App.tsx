@@ -12,6 +12,7 @@ import ContactsPage from "@/pages/Contacts";
 import ContactDetailPage from "@/pages/ContactDetail";
 import PipelinePage from "@/pages/Pipeline";
 import InboxPage from "@/pages/Inbox";
+import AiAssistantPage from "@/pages/AiAssistant";
 import StubPage from "@/components/StubPage";
 import NotFound from "@/pages/NotFound";
 import {
