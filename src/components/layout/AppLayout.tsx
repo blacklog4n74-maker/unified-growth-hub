@@ -128,6 +128,9 @@ export default function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Floating AI Widget */}
+      <AiChatWidget />
     </div>
   );
 }
